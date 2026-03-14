@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  CONFIG — replace CLIENT_ID with your Spotify app's Client ID
+//  CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 const CONFIG = {
-  CLIENT_ID:    '1c087b64008c49308fbcb7e8d17a2e25',   // ← paste here
+  CLIENT_ID:    '1c087b64008c49308fbcb7e8d17a2e25',
   REDIRECT_URI: window.location.origin + window.location.pathname,
   SCOPES:       'user-library-read',
-  MAX_SONGS:    300,   // max liked songs to fetch
-  ROUNDS:       10,    // rounds per game
+  MAX_SONGS:    300,
+  ROUNDS:       10,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,8 +24,8 @@ async function genChallenge(v) {
 }
 
 async function loginWithSpotify() {
-  const verifier   = genVerifier();
-  const challenge  = await genChallenge(verifier);
+  const verifier  = genVerifier();
+  const challenge = await genChallenge(verifier);
   localStorage.setItem('pkce_verifier', verifier);
   const p = new URLSearchParams({
     client_id:             CONFIG.CLIENT_ID,
@@ -75,8 +75,8 @@ async function refreshToken() {
 }
 
 function storeTokens(d) {
-  localStorage.setItem('access_token',  d.access_token);
-  localStorage.setItem('token_expiry',  Date.now() + d.expires_in * 1000);
+  localStorage.setItem('access_token', d.access_token);
+  localStorage.setItem('token_expiry', Date.now() + d.expires_in * 1000);
   if (d.refresh_token) localStorage.setItem('refresh_token', d.refresh_token);
 }
 
@@ -111,31 +111,56 @@ async function fetchLikedSongs() {
     setText('loading-msg', `Loading your library… (${tracks.length} songs)`);
     const data = await apiFetch(url);
     if (!data) break;
-    tracks.push(...data.items.map(i => i.track));
+    tracks.push(...data.items.map(i => i.track).filter(t => t && t.name && t.artists?.length));
     url = data.next;
   }
 
-  return tracks.filter(t => t && t.preview_url && t.name && t.artists?.length);
+  return tracks;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ITUNES PREVIEW  (replaces Spotify's deprecated preview_url)
+// ─────────────────────────────────────────────────────────────────────────────
+const previewCache = new Map();
+
+async function getItunesPreview(trackName, artistName) {
+  const key = `${trackName}__${artistName}`;
+  if (previewCache.has(key)) return previewCache.get(key);
+
+  try {
+    const q   = encodeURIComponent(`${trackName} ${artistName}`);
+    const res = await fetch(
+      `https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`
+    );
+    const data  = await res.json();
+    const match = data.results?.find(r => r.previewUrl);
+    const url   = match?.previewUrl || null;
+    previewCache.set(key, url);
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  GAME STATE
 // ─────────────────────────────────────────────────────────────────────────────
 const G = {
-  songs:   [],
-  used:    new Set(),
-  current: null,
-  score:   0,
-  round:   0,
-  answered:  false,
-  timerID:   null,
+  songs:      [],
+  used:       new Set(),
+  current:    null,
+  previewUrl: null,
+  score:      0,
+  round:      0,
+  answered:   false,
+  timerID:    null,
   progressID: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-function $(id)       { return document.getElementById(id); }
+function $(id)          { return document.getElementById(id); }
 function setText(id, t) { $(id).textContent = t; }
 
 function showScreen(id) {
@@ -157,8 +182,7 @@ function shuffle(arr) {
 }
 
 function pickDecoys(pool, correct, n) {
-  const filtered = pool.filter(s => s.id !== correct.id);
-  return shuffle(filtered).slice(0, n);
+  return shuffle(pool.filter(s => s.id !== correct.id)).slice(0, n);
 }
 
 function pickNextSong() {
@@ -180,18 +204,15 @@ async function startGame() {
   const songs = await fetchLikedSongs();
 
   if (songs.length < 4) {
-    alert(
-      `Only ${songs.length} song(s) with previews were found in your library.\n` +
-      'You need at least 4. Try liking more songs on Spotify!'
-    );
+    alert(`Only ${songs.length} song(s) found in your library. You need at least 4 liked songs.`);
     logout();
     return;
   }
 
   G.songs = songs;
   G.used.clear();
-  G.score  = 0;
-  G.round  = 0;
+  G.score = 0;
+  G.round = 0;
 
   setText('total-rounds', CONFIG.ROUNDS);
   setText('max-score',    CONFIG.ROUNDS * 10);
@@ -200,9 +221,10 @@ async function startGame() {
   startRound();
 }
 
-function startRound() {
+async function startRound() {
   G.round++;
-  G.answered = false;
+  G.answered   = false;
+  G.previewUrl = null;
 
   clearInterval(G.timerID);
   clearInterval(G.progressID);
@@ -213,21 +235,49 @@ function startRound() {
 
   $('result-banner').classList.add('hidden');
   $('next-btn').classList.add('hidden');
-  $('play-btn').disabled = false;
 
   const artEl = $('album-art');
   artEl.style.backgroundImage = '';
   artEl.textContent = '🎵';
 
-  $('progress').style.width   = '0%';
-  $('timer-fill').style.width = '100%';
+  $('progress').style.width        = '0%';
+  $('timer-fill').style.width      = '100%';
   $('timer-fill').style.backgroundColor = '';
 
   updateHUD();
 
-  G.current = pickNextSong();
+  const playBtn = $('play-btn');
+  playBtn.disabled    = true;
+  playBtn.textContent = '⏳ Fetching preview…';
+
+  // Try up to 8 candidates until one has an iTunes preview
+  let found = false;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = pickNextSong();
+    const url       = await getItunesPreview(candidate.name, candidate.artists[0].name);
+    if (url) {
+      G.current    = candidate;
+      G.previewUrl = url;
+      found        = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    playBtn.textContent = '▶  Play Snippet';
+    const banner = $('result-banner');
+    banner.className = 'result-banner wrong';
+    banner.textContent = '⚠ Couldn\'t find previews for these songs, skipping…';
+    banner.classList.remove('hidden');
+    setTimeout(startRound, 2000);
+    return;
+  }
+
   const decoys = pickDecoys(G.songs, G.current, 3);
   renderChoices(G.current, decoys);
+
+  playBtn.textContent = '▶  Play Snippet';
+  playBtn.disabled    = false;
 }
 
 function updateHUD() {
@@ -236,7 +286,7 @@ function updateHUD() {
 }
 
 function renderChoices(correct, decoys) {
-  const options = shuffle([correct, ...decoys]);
+  const options   = shuffle([correct, ...decoys]);
   const container = $('choices');
   container.innerHTML = '';
   options.forEach(song => {
@@ -252,7 +302,7 @@ function renderChoices(correct, decoys) {
 
 function playSnippet() {
   const audio = $('audio-player');
-  audio.src = G.current.preview_url;
+  audio.src         = G.previewUrl;
   audio.currentTime = 0;
   audio.play().catch(() => {});
   $('play-btn').disabled = true;
@@ -272,7 +322,7 @@ function playSnippet() {
 
 function startTimer() {
   let remaining = 30;
-  const fill = $('timer-fill');
+  const fill    = $('timer-fill');
   clearInterval(G.timerID);
 
   G.timerID = setInterval(() => {
@@ -295,11 +345,10 @@ function onChoice(selected, btn) {
 }
 
 function revealAnswer(selected, clickedBtn = null) {
-  G.answered = true;
-  const correct = G.current;
+  G.answered      = true;
+  const correct   = G.current;
   const isCorrect = selected && selected.id === correct.id;
 
-  // Reveal album art
   const img = correct.album.images[0]?.url;
   if (img) {
     const artEl = $('album-art');
@@ -307,11 +356,10 @@ function revealAnswer(selected, clickedBtn = null) {
     artEl.textContent = '';
   }
 
-  // Colour buttons
   document.querySelectorAll('.choice-btn').forEach(btn => {
     btn.disabled = true;
-    const name = btn.querySelector('.track-name').textContent;
-    if (name === correct.name) btn.classList.add('correct');
+    const name   = btn.querySelector('.track-name').textContent;
+    if (name === correct.name)  btn.classList.add('correct');
     else if (btn === clickedBtn) btn.classList.add('wrong');
   });
 
@@ -319,8 +367,8 @@ function revealAnswer(selected, clickedBtn = null) {
   updateHUD();
 
   const banner = $('result-banner');
-  banner.className = `result-banner ${isCorrect ? 'correct' : 'wrong'}`;
-  banner.textContent = isCorrect
+  banner.className    = `result-banner ${isCorrect ? 'correct' : 'wrong'}`;
+  banner.textContent  = isCorrect
     ? '✓ Correct! +10 points'
     : `✗ It was "${correct.name}" — ${correct.artists[0].name}`;
   banner.classList.remove('hidden');
@@ -357,7 +405,11 @@ async function init() {
   if (code) {
     history.replaceState({}, '', window.location.pathname);
     try { await exchangeCode(code); }
-    catch (e) { alert('Spotify auth failed. Check your Client ID and Redirect URI.'); logout(); return; }
+    catch (e) {
+      alert('Spotify auth failed. Check your Client ID and Redirect URI.');
+      logout();
+      return;
+    }
     await startGame();
     return;
   }
