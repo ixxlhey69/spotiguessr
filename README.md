@@ -1,71 +1,50 @@
-# 🎵 Spotify Song Guesser v2
+# 🎵 Spotify Song Guesser v3
 
-A competitive single-player music quiz using your Spotify **Liked Songs**.
-No backend. No cost. Runs 100% in the browser and hosts free on GitHub Pages.
-
----
-
-## Features
-- **4 difficulty modes**: Chill, Normal, Hard (type song name), Insane (type artist name)
-- **Time-based scoring**: faster answers = more points (up to 20 pts/round)
-- **Streak multiplier**: consecutive correct answers multiply your score
-- **Autocomplete input**: fuzzy-matching as you type in Hard/Insane modes
-- **Local leaderboard**: saves top 50 scores in your browser, filterable by difficulty
-- **PKCE OAuth**: no backend needed, Client ID is safe to expose
-- **iTunes previews**: uses Apple's free iTunes API since Spotify deprecated preview_url in Nov 2024
+Competitive single-player music quiz using your Spotify **Liked Songs** or any **playlist**.
+No backend. No cost. Fully runs in the browser.
 
 ---
 
-## Setup
-
-### 1. Create a Spotify Developer App
-1. Go to https://developer.spotify.com/dashboard and log in.
-2. Click **Create app**.
-3. Under **Redirect URIs**, add your GitHub Pages URL:
-   `https://YOUR_USERNAME.github.io/spotify-song-guesser/`
-4. Tick **Web API** under APIs used. Save.
-5. Copy your **Client ID**.
-
-> The exact redirect URI is shown on the login screen of the game — copy it from there.
-
-### 2. Your Client ID is already set
-The `app.js` in this repo already has your Client ID filled in.
-
-### 3. Deploy to GitHub Pages
-1. Push all files to a GitHub repo (`main` branch, root directory).
-2. **Settings → Pages → Source → Deploy from branch → main / root**.
-3. Live in ~30 seconds at `https://YOUR_USERNAME.github.io/spotify-song-guesser/`.
+## New in v3
+- **Playlist support** — pick any of your Spotify playlists as the song pool
+- **Skip button** — 3 skips per game (costs your streak, no points)
+- **Exit button** — pause + confirm modal to exit without losing your browser session
+- **Source picker screen** — choose Liked Songs or any playlist before each game
 
 ---
 
-## Scoring
+## Scoring (max 200 pts / game)
 
 | Event | Points |
 |---|---|
-| Correct answer | 10 base pts |
-| Time bonus | up to +10 pts (proportional to time remaining) |
-| Streak x2 | ×1.1 multiplier |
-| Streak x3+ | up to ×1.5 multiplier |
-| Wrong / timeout | 0 pts, streak resets |
-
-Max score: **200 points** per game (10 rounds × 20 pts).
+| Correct answer | 10 base |
+| Time bonus | up to +10 (proportional to time left) |
+| Streak ×2 | ×1.1 multiplier |
+| Streak ×3+ | up to ×1.5 |
+| Wrong / timeout / skip | 0 pts, streak resets |
 
 ---
 
 ## Difficulty Modes
 
-| Mode | Timer | Answer type | Streak bonus |
-|---|---|---|---|
-| 🌿 Chill | 30s | 4 choices | No |
-| 🎯 Normal | 20s | 4 choices | Yes |
-| 🔥 Hard | 15s | Type song name | Yes |
-| 💀 Insane | 7s | Type artist name | Yes |
+| Mode | Timer | Answer type |
+|---|---|---|
+| 🌿 Chill | 30s | 4 choices |
+| 🎯 Normal | 20s | 4 choices + streak |
+| 🔥 Hard | 15s | Type song name |
+| 💀 Insane | 7s | Type artist name |
 
 ---
 
-## Local Testing
+## Setup
 
+1. Go to https://developer.spotify.com/dashboard → Create app
+2. Add Redirect URI: `https://YOUR_USERNAME.github.io/spotify-song-guesser/`
+3. Enable scopes: Web API
+4. Your Client ID is already filled in `app.js`
+5. Push to GitHub → Settings → Pages → main / root
+
+## Local Testing
 ```bash
 python -m http.server 5500
-# then open http://localhost:5500/
 ```

@@ -8,12 +8,12 @@
 </head>
 <body>
 
-<!-- ── LOGIN ── -->
+<!-- LOGIN -->
 <div id="login-screen" class="screen active">
   <div class="card login-card">
     <div class="logo">🎵</div>
     <h1>Song Guesser</h1>
-    <p>Guess songs from your Spotify liked library</p>
+    <p>Guess songs from your Spotify library</p>
     <button id="login-btn" class="btn btn-spotify">Connect with Spotify</button>
     <div class="redirect-hint">
       <small>Add this URL to your Spotify app's Redirect URIs:</small>
@@ -22,51 +22,68 @@
   </div>
 </div>
 
-<!-- ── LOADING ── -->
+<!-- LOADING -->
 <div id="loading-screen" class="screen">
   <div class="card">
     <div class="spinner"></div>
-    <p id="loading-msg">Loading your library…</p>
+    <p id="loading-msg">Loading…</p>
   </div>
 </div>
 
-<!-- ── DIFFICULTY PICK ── -->
+<!-- SOURCE PICKER -->
+<div id="source-screen" class="screen">
+  <div class="card" style="max-width:480px">
+    <h2>Pick a Source</h2>
+    <p style="margin-bottom:18px">Choose which songs to guess from</p>
+    <button id="src-liked-btn" class="btn btn-spotify" style="margin-bottom:12px">❤️ Liked Songs</button>
+    <div id="playlist-list" class="playlist-list"></div>
+    <div id="playlist-loading" class="playlist-loading hidden">
+      <div class="spinner" style="width:28px;height:28px;border-width:3px;margin:0 auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DIFFICULTY -->
 <div id="difficulty-screen" class="screen">
   <div class="card diff-card">
+    <div id="source-label" class="source-label"></div>
     <h2>Choose Difficulty</h2>
     <div class="diff-grid">
       <button class="diff-btn" data-diff="chill">
-        <span class="diff-icon">🌿</span>
-        <strong>Chill</strong>
-        <small>4 choices · 30 sec · no streaks</small>
+        <span class="diff-icon">🌿</span><strong>Chill</strong>
+        <small>4 choices · 30s · no streaks</small>
       </button>
       <button class="diff-btn" data-diff="normal">
-        <span class="diff-icon">🎯</span>
-        <strong>Normal</strong>
-        <small>4 choices · 20 sec · streak bonus</small>
+        <span class="diff-icon">🎯</span><strong>Normal</strong>
+        <small>4 choices · 20s · streak bonus</small>
       </button>
       <button class="diff-btn" data-diff="hard">
-        <span class="diff-icon">🔥</span>
-        <strong>Hard</strong>
-        <small>Type song name · 15 sec · streak bonus</small>
+        <span class="diff-icon">🔥</span><strong>Hard</strong>
+        <small>Type song name · 15s · streak bonus</small>
       </button>
       <button class="diff-btn" data-diff="insane">
-        <span class="diff-icon">💀</span>
-        <strong>Insane</strong>
-        <small>Type artist name · 7 sec · streak bonus</small>
+        <span class="diff-icon">💀</span><strong>Insane</strong>
+        <small>Type artist · 7s · streak bonus</small>
       </button>
     </div>
-    <button id="leaderboard-btn" class="btn btn-outline" style="margin-top:22px">🏆 View Leaderboard</button>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button id="back-to-source-btn" class="btn btn-outline" style="flex:1">← Back</button>
+      <button id="leaderboard-btn" class="btn btn-outline" style="flex:1">🏆 Leaderboard</button>
+    </div>
   </div>
 </div>
 
-<!-- ── GAME ── -->
+<!-- GAME -->
 <div id="game-screen" class="screen">
   <header>
     <div class="score-display">
       <span>Score: <strong id="score">0</strong></span>
       <span>Round: <strong id="round">1</strong>/<strong id="total-rounds">10</strong></span>
       <span id="streak-display" class="hidden">🔥 <strong id="streak">0</strong></span>
+    </div>
+    <div class="header-actions">
+      <button id="skip-btn" class="btn-icon" title="Skip song">⏭</button>
+      <button id="exit-btn" class="btn-icon btn-icon-danger" title="Exit game">✕</button>
     </div>
   </header>
 
@@ -87,10 +104,8 @@
       <span id="timer-label" class="timer-label">–</span>
     </div>
 
-    <!-- Multiple choice (chill/normal) -->
     <div class="choices" id="choices"></div>
 
-    <!-- Type answer (hard/insane) -->
     <div id="type-area" class="type-area hidden">
       <div class="autocomplete-wrap">
         <input id="guess-input" class="guess-input" type="text" placeholder="Start typing…" autocomplete="off" spellcheck="false"/>
@@ -105,27 +120,40 @@
   </div>
 </div>
 
-<!-- ── RESULTS ── -->
+<!-- EXIT CONFIRM MODAL -->
+<div id="exit-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h3>Exit Game?</h3>
+    <p>Your current score won't be saved.</p>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button id="exit-cancel-btn" class="btn btn-outline" style="flex:1">Keep Playing</button>
+      <button id="exit-confirm-btn" class="btn btn-danger-solid" style="flex:1">Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
 <div id="results-screen" class="screen">
   <div class="card">
     <h2>Game Over!</h2>
     <div class="final-score-wrap">
-      <span id="final-score">0</span><span class="out-of"> / <span id="max-score">100</span></span>
+      <span id="final-score">0</span><span class="out-of"> / <span id="max-score">200</span></span>
     </div>
     <p id="final-message"></p>
     <div class="name-entry">
-      <input id="player-name" class="guess-input" type="text" maxlength="20" placeholder="Enter your name for leaderboard"/>
+      <input id="player-name" class="guess-input" type="text" maxlength="20" placeholder="Your name for leaderboard"/>
       <button id="save-score-btn" class="btn btn-spotify">Save Score 🏆</button>
     </div>
     <div id="mini-leaderboard" class="mini-leaderboard"></div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button id="play-again-btn" class="btn btn-spotify" style="flex:1">Play Again</button>
-      <button id="change-diff-btn" class="btn btn-outline" style="flex:1">Change Difficulty</button>
+      <button id="change-diff-btn" class="btn btn-outline" style="flex:1">Change Mode</button>
     </div>
+    <button id="change-source-btn" class="btn btn-outline" style="margin-top:10px;width:100%">Change Source</button>
   </div>
 </div>
 
-<!-- ── LEADERBOARD ── -->
+<!-- LEADERBOARD -->
 <div id="leaderboard-screen" class="screen">
   <div class="card">
     <h2>🏆 Leaderboard</h2>
