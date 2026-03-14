@@ -2,7 +2,7 @@
 //  CONFIG — replace CLIENT_ID with your Spotify app's Client ID
 // ─────────────────────────────────────────────────────────────────────────────
 const CONFIG = {
-  CLIENT_ID:    'YOUR_SPOTIFY_CLIENT_ID',   // ← paste here
+  CLIENT_ID:    '1c087b64008c49308fbcb7e8d17a2e25',   // ← paste here
   REDIRECT_URI: window.location.origin + window.location.pathname,
   SCOPES:       'user-library-read',
   MAX_SONGS:    300,   // max liked songs to fetch
