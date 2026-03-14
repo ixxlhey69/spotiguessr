@@ -1,74 +1,144 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Spotify Song Guesser</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-  <!-- Login -->
-  <div id="login-screen" class="screen active">
-    <div class="card login-card">
-      <div class="logo">🎵</div>
-      <h1>Song Guesser</h1>
-      <p>Guess songs from your Spotify liked library</p>
-      <button id="login-btn" class="btn btn-spotify">Connect with Spotify</button>
-      <div class="redirect-hint">
-        <small>Add this URL to your Spotify app's Redirect URIs:</small>
-        <code id="redirect-display"></code>
-      </div>
+<!-- ── LOGIN ── -->
+<div id="login-screen" class="screen active">
+  <div class="card login-card">
+    <div class="logo">🎵</div>
+    <h1>Song Guesser</h1>
+    <p>Guess songs from your Spotify liked library</p>
+    <button id="login-btn" class="btn btn-spotify">Connect with Spotify</button>
+    <div class="redirect-hint">
+      <small>Add this URL to your Spotify app's Redirect URIs:</small>
+      <code id="redirect-display"></code>
     </div>
   </div>
+</div>
 
-  <!-- Loading -->
-  <div id="loading-screen" class="screen">
-    <div class="card">
-      <div class="spinner"></div>
-      <p id="loading-msg">Loading your library…</p>
-    </div>
+<!-- ── LOADING ── -->
+<div id="loading-screen" class="screen">
+  <div class="card">
+    <div class="spinner"></div>
+    <p id="loading-msg">Loading your library…</p>
   </div>
+</div>
 
-  <!-- Game -->
-  <div id="game-screen" class="screen">
-    <header>
-      <div class="score-display">
-        <span>Score: <strong id="score">0</strong></span>
-        <span>Round: <strong id="round">1</strong> / <strong id="total-rounds">10</strong></span>
+<!-- ── DIFFICULTY PICK ── -->
+<div id="difficulty-screen" class="screen">
+  <div class="card diff-card">
+    <h2>Choose Difficulty</h2>
+    <div class="diff-grid">
+      <button class="diff-btn" data-diff="chill">
+        <span class="diff-icon">🌿</span>
+        <strong>Chill</strong>
+        <small>4 choices · 30 sec · no streaks</small>
+      </button>
+      <button class="diff-btn" data-diff="normal">
+        <span class="diff-icon">🎯</span>
+        <strong>Normal</strong>
+        <small>4 choices · 20 sec · streak bonus</small>
+      </button>
+      <button class="diff-btn" data-diff="hard">
+        <span class="diff-icon">🔥</span>
+        <strong>Hard</strong>
+        <small>Type song name · 15 sec · streak bonus</small>
+      </button>
+      <button class="diff-btn" data-diff="insane">
+        <span class="diff-icon">💀</span>
+        <strong>Insane</strong>
+        <small>Type artist name · 7 sec · streak bonus</small>
+      </button>
+    </div>
+    <button id="leaderboard-btn" class="btn btn-outline" style="margin-top:22px">🏆 View Leaderboard</button>
+  </div>
+</div>
+
+<!-- ── GAME ── -->
+<div id="game-screen" class="screen">
+  <header>
+    <div class="score-display">
+      <span>Score: <strong id="score">0</strong></span>
+      <span>Round: <strong id="round">1</strong>/<strong id="total-rounds">10</strong></span>
+      <span id="streak-display" class="hidden">🔥 <strong id="streak">0</strong></span>
+    </div>
+  </header>
+
+  <div class="game-card">
+    <div class="diff-badge" id="diff-badge"></div>
+
+    <div class="audio-section">
+      <div class="album-art" id="album-art">🎵</div>
+      <div class="audio-controls">
+        <button id="play-btn" class="btn btn-play">▶&nbsp;Play Snippet</button>
+        <div class="progress-bar"><div class="progress" id="progress"></div></div>
+        <audio id="audio-player" preload="none"></audio>
       </div>
-    </header>
+    </div>
 
-    <div class="game-card">
-      <div class="audio-section">
-        <div class="album-art" id="album-art">🎵</div>
-        <div class="audio-controls">
-          <button id="play-btn" class="btn btn-play">▶&nbsp; Play Snippet</button>
-          <div class="progress-bar"><div class="progress" id="progress"></div></div>
-          <audio id="audio-player" preload="none"></audio>
-        </div>
-      </div>
-
+    <div class="timer-wrap">
       <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
-
-      <div class="choices" id="choices"></div>
-      <div id="result-banner" class="result-banner hidden"></div>
-      <button id="next-btn" class="btn btn-next hidden">Next Song →</button>
+      <span id="timer-label" class="timer-label">–</span>
     </div>
-  </div>
 
-  <!-- Results -->
-  <div id="results-screen" class="screen">
-    <div class="card">
-      <h2>Game Over!</h2>
-      <div class="final-score-wrap">
-        <span id="final-score">0</span><span class="out-of"> / <span id="max-score">100</span></span>
+    <!-- Multiple choice (chill/normal) -->
+    <div class="choices" id="choices"></div>
+
+    <!-- Type answer (hard/insane) -->
+    <div id="type-area" class="type-area hidden">
+      <div class="autocomplete-wrap">
+        <input id="guess-input" class="guess-input" type="text" placeholder="Start typing…" autocomplete="off" spellcheck="false"/>
+        <ul id="autocomplete-list" class="autocomplete-list hidden"></ul>
       </div>
-      <p id="final-message"></p>
-      <button id="play-again-btn" class="btn btn-spotify">Play Again</button>
+      <button id="submit-guess-btn" class="btn btn-play" style="width:100%;margin-top:10px">Submit Guess</button>
+    </div>
+
+    <div id="result-banner" class="result-banner hidden"></div>
+    <div id="points-pop" class="points-pop hidden"></div>
+    <button id="next-btn" class="btn btn-next hidden">Next Song →</button>
+  </div>
+</div>
+
+<!-- ── RESULTS ── -->
+<div id="results-screen" class="screen">
+  <div class="card">
+    <h2>Game Over!</h2>
+    <div class="final-score-wrap">
+      <span id="final-score">0</span><span class="out-of"> / <span id="max-score">100</span></span>
+    </div>
+    <p id="final-message"></p>
+    <div class="name-entry">
+      <input id="player-name" class="guess-input" type="text" maxlength="20" placeholder="Enter your name for leaderboard"/>
+      <button id="save-score-btn" class="btn btn-spotify">Save Score 🏆</button>
+    </div>
+    <div id="mini-leaderboard" class="mini-leaderboard"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button id="play-again-btn" class="btn btn-spotify" style="flex:1">Play Again</button>
+      <button id="change-diff-btn" class="btn btn-outline" style="flex:1">Change Difficulty</button>
     </div>
   </div>
+</div>
 
-  <script src="app.js"></script>
+<!-- ── LEADERBOARD ── -->
+<div id="leaderboard-screen" class="screen">
+  <div class="card">
+    <h2>🏆 Leaderboard</h2>
+    <div class="lb-tabs" id="lb-tabs"></div>
+    <table class="lb-table" id="lb-table">
+      <thead><tr><th>#</th><th>Name</th><th>Score</th><th>Difficulty</th><th>Date</th></tr></thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+    <button id="lb-back-btn" class="btn btn-outline" style="margin-top:20px;width:100%">← Back</button>
+    <button id="lb-clear-btn" class="btn btn-danger" style="margin-top:10px;width:100%">🗑 Clear All Scores</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
