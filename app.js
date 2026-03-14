@@ -1,6 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-//  CONFIG
-// ─────────────────────────────────────────────────────────────────────────────
 const CONFIG = {
   CLIENT_ID:    '1c087b64008c49308fbcb7e8d17a2e25',
   REDIRECT_URI: window.location.origin + window.location.pathname,
@@ -18,9 +15,7 @@ const DIFFICULTIES = {
 
 const LB_KEY = 'ssg_leaderboard_v2';
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  PKCE AUTH
-// ─────────────────────────────────────────────────────────────────────────────
+// ── PKCE AUTH ──────────────────────────────────────────────────────────────
 function genVerifier() {
   const a = new Uint8Array(32); crypto.getRandomValues(a);
   return btoa(String.fromCharCode(...a)).replace(/[+/=]/g,c=>({'+':'-','/':'_','=':''}[c]));
@@ -33,15 +28,15 @@ async function loginWithSpotify() {
   const v=genVerifier(), c=await genChallenge(v);
   localStorage.setItem('pkce_verifier',v);
   location.href='https://accounts.spotify.com/authorize?'+new URLSearchParams({
-    client_id:CONFIG.CLIENT_ID,response_type:'code',redirect_uri:CONFIG.REDIRECT_URI,
-    code_challenge_method:'S256',code_challenge:c,scope:CONFIG.SCOPES,
+    client_id:CONFIG.CLIENT_ID, response_type:'code', redirect_uri:CONFIG.REDIRECT_URI,
+    code_challenge_method:'S256', code_challenge:c, scope:CONFIG.SCOPES,
   });
 }
 async function exchangeCode(code) {
   const r=await fetch('https://accounts.spotify.com/api/token',{
-    method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams({client_id:CONFIG.CLIENT_ID,grant_type:'authorization_code',
-      code,redirect_uri:CONFIG.REDIRECT_URI,code_verifier:localStorage.getItem('pkce_verifier')}),
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({ client_id:CONFIG.CLIENT_ID, grant_type:'authorization_code',
+      code, redirect_uri:CONFIG.REDIRECT_URI, code_verifier:localStorage.getItem('pkce_verifier') }),
   });
   const d=await r.json();
   if(!d.access_token) throw new Error(JSON.stringify(d));
@@ -50,16 +45,16 @@ async function exchangeCode(code) {
 async function refreshAccessToken() {
   const rt=localStorage.getItem('refresh_token'); if(!rt) return null;
   const r=await fetch('https://accounts.spotify.com/api/token',{
-    method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams({client_id:CONFIG.CLIENT_ID,grant_type:'refresh_token',refresh_token:rt}),
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({ client_id:CONFIG.CLIENT_ID, grant_type:'refresh_token', refresh_token:rt }),
   });
   const d=await r.json(); if(!d.access_token) return null;
   storeTokens(d); return d.access_token;
 }
 function storeTokens(d) {
-  localStorage.setItem('access_token',d.access_token);
-  localStorage.setItem('token_expiry',Date.now()+d.expires_in*1000);
-  if(d.refresh_token) localStorage.setItem('refresh_token',d.refresh_token);
+  localStorage.setItem('access_token', d.access_token);
+  localStorage.setItem('token_expiry', Date.now()+d.expires_in*1000);
+  if(d.refresh_token) localStorage.setItem('refresh_token', d.refresh_token);
 }
 async function getToken() {
   const exp=parseInt(localStorage.getItem('token_expiry')||'0');
@@ -68,9 +63,7 @@ async function getToken() {
 }
 function logout(){ localStorage.clear(); location.href=location.pathname; }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SPOTIFY API
-// ─────────────────────────────────────────────────────────────────────────────
+// ── SPOTIFY API ────────────────────────────────────────────────────────────
 async function apiFetch(url) {
   const token=await getToken(); if(!token){logout();return null;}
   const r=await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
@@ -85,7 +78,9 @@ async function fetchLikedSongs() {
   while(url && tracks.length<CONFIG.MAX_SONGS){
     setText('loading-msg',`Loading liked songs… (${tracks.length})`);
     const d=await apiFetch(url); if(!d) break;
-    tracks.push(...d.items.map(i=>i.track).filter(t=>t&&t.name&&t.artists?.length));
+    tracks.push(...d.items
+      .map(i=>i?.track)
+      .filter(t=>t&&t.id&&t.name&&t.artists?.length));
     url=d.next;
   }
   return tracks;
@@ -96,19 +91,22 @@ async function fetchUserPlaylists() {
   let url='https://api.spotify.com/v1/me/playlists?limit=50';
   while(url){
     const d=await apiFetch(url); if(!d) break;
-    playlists.push(...d.items.filter(p=>p&&p.name));
+    playlists.push(...d.items.filter(p=>p&&p.id&&p.name));
     url=d.next;
   }
   return playlists;
 }
 
+// KEY FIX: removed the strict ?fields= param — it was stripping all track data
 async function fetchPlaylistTracks(playlistId) {
   const tracks=[];
-  let url=`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,name,artists,album))`;
+  let url=`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
   while(url && tracks.length<CONFIG.MAX_SONGS){
     setText('loading-msg',`Loading playlist… (${tracks.length} songs)`);
     const d=await apiFetch(url); if(!d) break;
-    tracks.push(...d.items.map(i=>i.track).filter(t=>t&&t.name&&t.artists?.length));
+    tracks.push(...d.items
+      .map(i=>i?.track)
+      .filter(t=>t&&t.id&&t.name&&t.artists?.length)); // filters out local/null tracks
     url=d.next;
   }
   return tracks;
@@ -119,9 +117,7 @@ async function fetchSpotifyUsername() {
   return d?.display_name||'';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  ITUNES PREVIEW
-// ─────────────────────────────────────────────────────────────────────────────
+// ── ITUNES PREVIEW ─────────────────────────────────────────────────────────
 const previewCache=new Map();
 async function getItunesPreview(name,artist) {
   const key=`${name}__${artist}`;
@@ -134,22 +130,17 @@ async function getItunesPreview(name,artist) {
   } catch { return null; }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  LEADERBOARD
-// ─────────────────────────────────────────────────────────────────────────────
+// ── LEADERBOARD ────────────────────────────────────────────────────────────
 function getLB(){ try{return JSON.parse(localStorage.getItem(LB_KEY)||'[]');}catch{return[];} }
 function saveLB(e){ localStorage.setItem(LB_KEY,JSON.stringify(e)); }
 function addToLB(name,score,diff) {
   const data=getLB();
   const entry={name:name.trim()||'Anonymous',score,diff,ts:Date.now()};
-  data.push(entry);
-  data.sort((a,b)=>b.score-a.score||a.ts-b.ts);
+  data.push(entry); data.sort((a,b)=>b.score-a.score||a.ts-b.ts);
   saveLB(data.slice(0,50)); return data.slice(0,50);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  GAME STATE
-// ─────────────────────────────────────────────────────────────────────────────
+// ── GAME STATE ─────────────────────────────────────────────────────────────
 const G={
   songs:[],used:new Set(),current:null,previewUrl:null,
   score:0,round:0,streak:0,skipsLeft:3,
@@ -158,9 +149,7 @@ const G={
   roundStartTime:0,spotifyName:'',lastEntry:null,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  DOM HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── DOM HELPERS ────────────────────────────────────────────────────────────
 const $=id=>document.getElementById(id);
 const setText=(id,t)=>$(id).textContent=t;
 function showScreen(id){
@@ -191,9 +180,7 @@ function updateSkipBtn(){
   $('skip-btn').disabled=G.skipsLeft<=0||G.answered;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  INIT
-// ─────────────────────────────────────────────────────────────────────────────
+// ── INIT ───────────────────────────────────────────────────────────────────
 async function init() {
   setText('redirect-display',CONFIG.REDIRECT_URI);
   const code=new URLSearchParams(location.search).get('code');
@@ -210,9 +197,7 @@ async function init() {
   await showSourceScreen();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SOURCE SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
+// ── SOURCE SCREEN ──────────────────────────────────────────────────────────
 async function showSourceScreen() {
   showScreen('source-screen');
   $('playlist-list').innerHTML='';
@@ -221,24 +206,31 @@ async function showSourceScreen() {
   const playlists=await fetchUserPlaylists();
   $('playlist-loading').classList.add('hidden');
 
+  if(!playlists.length){
+    $('playlist-list').innerHTML='<p style="color:var(--muted);font-size:.88rem;padding:12px 0">No playlists found. Try re-logging in.</p>';
+    return;
+  }
+
   playlists.forEach(pl=>{
     const btn=document.createElement('button');
     btn.className='playlist-item';
     const thumb=pl.images?.[0]?.url;
+    // KEY FIX: pl.tracks is {href,total} — use total directly, fallback gracefully
+    const count = pl.tracks?.total != null ? `${pl.tracks.total} songs` : 'playlist';
     btn.innerHTML=`
       ${thumb
         ? `<img class="playlist-thumb" src="${esc(thumb)}" alt="" loading="lazy"/>`
         : `<div class="playlist-thumb-placeholder">🎵</div>`}
       <div class="playlist-info">
         <span class="playlist-name">${esc(pl.name)}</span>
-        <span class="playlist-meta">${pl.tracks?.total||'?'} songs</span>
+        <span class="playlist-meta">${count}</span>
       </div>`;
     btn.addEventListener('click',()=>selectSource('playlist',pl.id,pl.name));
     $('playlist-list').appendChild(btn);
   });
 }
 
-async function selectSource(type, id='', name='Liked Songs') {
+async function selectSource(type,id='',name='Liked Songs') {
   showScreen('loading-screen');
   setText('loading-msg','Loading songs…');
   let songs;
@@ -250,7 +242,7 @@ async function selectSource(type, id='', name='Liked Songs') {
     G.sourceName='📋 '+name;
   }
   if(songs.length<4){
-    alert(`Only ${songs.length} songs found. Need at least 4.`);
+    alert(`Only ${songs.length} playable songs found in "${name}".\nThis playlist may have mostly local files or songs without previews.\nTry another playlist or use Liked Songs.`);
     await showSourceScreen(); return;
   }
   G.songs=songs;
@@ -258,9 +250,7 @@ async function selectSource(type, id='', name='Liked Songs') {
   showScreen('difficulty-screen');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  BEGIN GAME
-// ─────────────────────────────────────────────────────────────────────────────
+// ── BEGIN GAME ─────────────────────────────────────────────────────────────
 function beginGame(diff) {
   G.diff=diff; G.used.clear();
   G.score=0; G.round=0; G.streak=0; G.skipsLeft=3;
@@ -271,42 +261,33 @@ function beginGame(diff) {
   startRound();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  ROUND
-// ─────────────────────────────────────────────────────────────────────────────
+// ── ROUND ──────────────────────────────────────────────────────────────────
 async function startRound() {
   G.round++; G.answered=false; G.previewUrl=null;
   clearInterval(G.timerID); clearInterval(G.progressID);
-
   const audio=$('audio-player');
   audio.pause(); audio.removeAttribute('src');
-
   $('result-banner').classList.add('hidden');
   $('next-btn').classList.add('hidden');
   $('choices').innerHTML='';
   $('type-area').classList.add('hidden');
   $('guess-input').value='';
   $('autocomplete-list').classList.add('hidden');
-
   const art=$('album-art');
   art.style.backgroundImage=''; art.textContent='🎵';
   $('progress').style.width='0%';
   $('timer-fill').style.width='100%';
   $('timer-fill').style.backgroundColor='';
   $('timer-label').textContent=DIFFICULTIES[G.diff].timer+'s';
-
   updateHUD(); updateSkipBtn();
-
   const playBtn=$('play-btn');
   playBtn.disabled=true; playBtn.textContent='⏳ Fetching preview…';
-
   let found=false;
   for(let i=0;i<8;i++){
     const c=pickNextSong();
     const u=await getItunesPreview(c.name,c.artists[0].name);
     if(u){G.current=c;G.previewUrl=u;found=true;break;}
   }
-
   if(!found){
     const b=$('result-banner');
     b.className='result-banner timeout';
@@ -314,7 +295,6 @@ async function startRound() {
     b.classList.remove('hidden');
     setTimeout(startRound,1800); return;
   }
-
   const mode=DIFFICULTIES[G.diff].mode;
   if(mode==='choice'){
     renderChoices(G.current,pickDecoys(G.songs,G.current,3));
@@ -328,9 +308,7 @@ async function startRound() {
   playBtn.textContent='▶  Play Snippet'; playBtn.disabled=false;
 }
 
-function updateHUD(){
-  setText('score',G.score); setText('round',G.round); updateStreakDisplay();
-}
+function updateHUD(){ setText('score',G.score); setText('round',G.round); updateStreakDisplay(); }
 function updateStreakDisplay(){
   const el=$('streak-display');
   if(G.streak>=2&&DIFFICULTIES[G.diff].streakBonus){
@@ -338,33 +316,25 @@ function updateStreakDisplay(){
   } else { el.classList.add('hidden'); }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SKIP
-// ─────────────────────────────────────────────────────────────────────────────
+// ── SKIP ───────────────────────────────────────────────────────────────────
 function skipSong() {
   if(G.answered||G.skipsLeft<=0) return;
   clearInterval(G.timerID); clearInterval(G.progressID);
   $('audio-player').pause();
   G.skipsLeft--; G.streak=0; G.answered=true;
   updateHUD(); updateSkipBtn();
-
   const b=$('result-banner');
   b.className='result-banner skipped';
   b.textContent=`⏭ Skipped — it was "${G.current.name}" — ${G.current.artists[0].name}`;
   b.classList.remove('hidden');
-
   const img=G.current.album?.images?.[0]?.url;
   if(img){$('album-art').style.backgroundImage=`url(${img})`;$('album-art').textContent='';}
-
   document.querySelectorAll('.choice-btn').forEach(b=>b.disabled=true);
-
   if(G.round>=CONFIG.ROUNDS) setTimeout(showResults,1800);
   else $('next-btn').classList.remove('hidden');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  CHOICES
-// ─────────────────────────────────────────────────────────────────────────────
+// ── CHOICES ────────────────────────────────────────────────────────────────
 function renderChoices(correct,decoys){
   const opts=shuffle([correct,...decoys]);
   const c=$('choices'); c.innerHTML='';
@@ -383,21 +353,17 @@ function onChoiceClick(selected,clickedBtn){
   revealAnswer(selected.id===G.current.id,(Date.now()-G.roundStartTime)/1000,clickedBtn);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  TYPE + AUTOCOMPLETE
-// ─────────────────────────────────────────────────────────────────────────────
+// ── TYPE + AUTOCOMPLETE ────────────────────────────────────────────────────
 function buildAutocomplete(mode){
   const pool=G.songs.map(s=>mode==='type_track'?s.name:s.artists[0].name);
   const unique=[...new Set(pool)].sort((a,b)=>a.localeCompare(b));
   const input=$('guess-input'), list=$('autocomplete-list');
   input.placeholder=mode==='type_track'?'Type the song name…':'Type the artist name…';
   let activeIdx=-1;
-
   function renderAC(f){
     list.innerHTML=''; if(!f.length){list.classList.add('hidden');return;}
-    f.slice(0,8).forEach((item,i)=>{
-      const li=document.createElement('li');
-      li.textContent=item;
+    f.slice(0,8).forEach(item=>{
+      const li=document.createElement('li'); li.textContent=item;
       li.addEventListener('mousedown',e=>{e.preventDefault();input.value=item;list.classList.add('hidden');});
       list.appendChild(li);
     });
@@ -420,7 +386,6 @@ function buildAutocomplete(mode){
   };
   input.onblur=()=>setTimeout(()=>list.classList.add('hidden'),120);
 }
-
 function submitTypeGuess(){
   if(G.answered) return;
   const val=$('guess-input').value.trim().toLowerCase(); if(!val) return;
@@ -430,30 +395,24 @@ function submitTypeGuess(){
   const correct=(mode==='type_track'?G.current.name:G.current.artists[0].name).toLowerCase();
   revealAnswer(fuzzyMatch(val,correct),(Date.now()-G.roundStartTime)/1000,null);
 }
-
 function fuzzyMatch(input,target){
   if(input===target) return true;
   const clean=s=>s.replace(/\s*[\(\[].*/,'').replace(/[^a-z0-9\s]/g,'').trim();
   return clean(input)===clean(target)||target.startsWith(clean(input))||clean(input).startsWith(clean(target));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SCORING + REVEAL
-// ─────────────────────────────────────────────────────────────────────────────
+// ── SCORING + REVEAL ───────────────────────────────────────────────────────
 function calcPoints(elapsed){
   const t=DIFFICULTIES[G.diff].timer;
-  const base=10, timeBonus=Math.round(Math.max(0,(t-elapsed)/t)*10);
-  let pts=base+timeBonus;
+  let pts=10+Math.round(Math.max(0,(t-elapsed)/t)*10);
   if(DIFFICULTIES[G.diff].streakBonus&&G.streak>=2)
     pts=Math.round(pts*Math.min(1+(G.streak-1)*0.1,1.5));
   return pts;
 }
-
 function revealAnswer(isCorrect,elapsed,clickedBtn){
   G.answered=true;
   const img=G.current.album?.images?.[0]?.url;
   if(img){$('album-art').style.backgroundImage=`url(${img})`;$('album-art').textContent='';}
-
   if(clickedBtn){
     document.querySelectorAll('.choice-btn').forEach(b=>{
       b.disabled=true;
@@ -461,30 +420,19 @@ function revealAnswer(isCorrect,elapsed,clickedBtn){
       else if(b===clickedBtn) b.classList.add('wrong');
     });
   }
-
-  if(isCorrect){
-    G.streak++;
-    const pts=calcPoints(elapsed);
-    G.score+=pts; popPoints(`+${pts}`);
-  } else { G.streak=0; }
-
+  if(isCorrect){G.streak++;const pts=calcPoints(elapsed);G.score+=pts;popPoints(`+${pts}`);}
+  else{G.streak=0;}
   updateHUD();
-
   const banner=$('result-banner');
   banner.className=`result-banner ${isCorrect?'correct':'wrong'}`;
-  banner.textContent=isCorrect
-    ?'✓ Correct!'
-    :`✗ It was "${G.current.name}" — ${G.current.artists[0].name}`;
+  banner.textContent=isCorrect?'✓ Correct!':`✗ It was "${G.current.name}" — ${G.current.artists[0].name}`;
   banner.classList.remove('hidden');
   updateSkipBtn();
-
   if(G.round>=CONFIG.ROUNDS) setTimeout(showResults,1800);
   else $('next-btn').classList.remove('hidden');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  AUDIO + TIMER
-// ─────────────────────────────────────────────────────────────────────────────
+// ── AUDIO + TIMER ──────────────────────────────────────────────────────────
 function playSnippet(){
   const audio=$('audio-player');
   audio.src=G.previewUrl; audio.currentTime=0;
@@ -495,17 +443,12 @@ function playSnippet(){
   G.progressID=setInterval(()=>{
     $('progress').style.width=`${Math.min((audio.currentTime/30)*100,100)}%`;
   },100);
-  audio.onended=()=>{
-    clearInterval(G.progressID);
-    if(!G.answered) timeoutRound();
-  };
+  audio.onended=()=>{clearInterval(G.progressID);if(!G.answered) timeoutRound();};
   startTimer();
   if(!$('type-area').classList.contains('hidden')) $('guess-input').focus();
 }
-
 function startTimer(){
-  let rem=DIFFICULTIES[G.diff].timer;
-  clearInterval(G.timerID);
+  let rem=DIFFICULTIES[G.diff].timer; clearInterval(G.timerID);
   G.timerID=setInterval(()=>{
     rem-=0.1;
     $('timer-fill').style.width=`${Math.max((rem/DIFFICULTIES[G.diff].timer)*100,0)}%`;
@@ -514,7 +457,6 @@ function startTimer(){
     if(rem<=0){clearInterval(G.timerID);if(!G.answered) timeoutRound();}
   },100);
 }
-
 function timeoutRound(){
   G.answered=true; G.streak=0; updateHUD(); updateSkipBtn();
   const img=G.current.album?.images?.[0]?.url;
@@ -528,12 +470,9 @@ function timeoutRound(){
   else $('next-btn').classList.remove('hidden');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  RESULTS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── RESULTS ────────────────────────────────────────────────────────────────
 function showResults(){
-  setText('final-score',G.score);
-  setText('max-score',CONFIG.ROUNDS*20);
+  setText('final-score',G.score); setText('max-score',CONFIG.ROUNDS*20);
   const pct=G.score/(CONFIG.ROUNDS*20);
   setText('final-message',
     pct===1.0?'🏆 Perfect score! Legendary.':
@@ -547,13 +486,12 @@ function showResults(){
   $('save-score-btn').onclick=saveAndShowMiniLB;
   showScreen('results-screen');
 }
-
 function saveAndShowMiniLB(){
   const name=$('player-name').value.trim()||G.spotifyName||'Anonymous';
   const entry={name,score:G.score,diff:G.diff,ts:Date.now()};
   const all=getLB(); all.push(entry);
-  all.sort((a,b)=>b.score-a.score||a.ts-b.ts);
-  saveLB(all.slice(0,50)); G.lastEntry=entry;
+  all.sort((a,b)=>b.score-a.score||a.ts-b.ts); saveLB(all.slice(0,50));
+  G.lastEntry=entry;
   const rank=all.findIndex(e=>e.ts===entry.ts)+1;
   const wrap=$('mini-leaderboard');
   wrap.innerHTML=`<h3>Your Rank: #${rank} of ${all.length}</h3><ol></ol>`;
@@ -568,9 +506,7 @@ function saveAndShowMiniLB(){
   $('save-score-btn').textContent='✓ Saved';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  LEADERBOARD
-// ─────────────────────────────────────────────────────────────────────────────
+// ── LEADERBOARD ────────────────────────────────────────────────────────────
 let lbFilter='all';
 function showLeaderboard(){ renderLeaderboard(); showScreen('leaderboard-screen'); }
 function renderLeaderboard(){
@@ -598,9 +534,7 @@ function renderLeaderboard(){
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  EXIT MODAL
-// ─────────────────────────────────────────────────────────────────────────────
+// ── EXIT MODAL ─────────────────────────────────────────────────────────────
 function showExitModal(){
   clearInterval(G.timerID); clearInterval(G.progressID);
   $('audio-player').pause();
@@ -615,9 +549,7 @@ function confirmExit(){
   showScreen('difficulty-screen');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  EVENT LISTENERS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── EVENT LISTENERS ────────────────────────────────────────────────────────
 $('login-btn').addEventListener('click',loginWithSpotify);
 $('src-liked-btn').addEventListener('click',()=>selectSource('liked'));
 $('back-to-source-btn').addEventListener('click',showSourceScreen);
