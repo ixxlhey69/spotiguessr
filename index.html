@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spotify Song Guesser</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Login -->
+  <div id="login-screen" class="screen active">
+    <div class="card login-card">
+      <div class="logo">🎵</div>
+      <h1>Song Guesser</h1>
+      <p>Guess songs from your Spotify liked library</p>
+      <button id="login-btn" class="btn btn-spotify">Connect with Spotify</button>
+      <div class="redirect-hint">
+        <small>Add this URL to your Spotify app's Redirect URIs:</small>
+        <code id="redirect-display"></code>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading-screen" class="screen">
+    <div class="card">
+      <div class="spinner"></div>
+      <p id="loading-msg">Loading your library…</p>
+    </div>
+  </div>
+
+  <!-- Game -->
+  <div id="game-screen" class="screen">
+    <header>
+      <div class="score-display">
+        <span>Score: <strong id="score">0</strong></span>
+        <span>Round: <strong id="round">1</strong> / <strong id="total-rounds">10</strong></span>
+      </div>
+    </header>
+
+    <div class="game-card">
+      <div class="audio-section">
+        <div class="album-art" id="album-art">🎵</div>
+        <div class="audio-controls">
+          <button id="play-btn" class="btn btn-play">▶&nbsp; Play Snippet</button>
+          <div class="progress-bar"><div class="progress" id="progress"></div></div>
+          <audio id="audio-player" preload="none"></audio>
+        </div>
+      </div>
+
+      <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+
+      <div class="choices" id="choices"></div>
+      <div id="result-banner" class="result-banner hidden"></div>
+      <button id="next-btn" class="btn btn-next hidden">Next Song →</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-screen" class="screen">
+    <div class="card">
+      <h2>Game Over!</h2>
+      <div class="final-score-wrap">
+        <span id="final-score">0</span><span class="out-of"> / <span id="max-score">100</span></span>
+      </div>
+      <p id="final-message"></p>
+      <button id="play-again-btn" class="btn btn-spotify">Play Again</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
